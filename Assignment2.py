@@ -22,9 +22,7 @@ def extract_features(sentence):
             it_position = i
             break
 
-    return {
-        'F1_position': it_position
-    }
+    return it_position
 
 
 def process_corpus(file_path):
@@ -51,7 +49,7 @@ def process_corpus(file_path):
 
                 features = extract_features(sentence)
                 results.append({
-                    'features': features
+                    'position': features
                 })
 
     return results
@@ -60,7 +58,6 @@ def process_corpus(file_path):
 if __name__ == '__main__':
     # Process the corpus
     results = process_corpus('it-corpus.tsv')
-
     print("F1 results:")
     for i, result in enumerate(results, start=1):
-        print(f" {i} :  F1 (Position of 'it'): {result['features']['F1_position']}")
+        print(f" {i} :  F1 (Position of 'it'): {result['position']}")
