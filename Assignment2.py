@@ -10,7 +10,7 @@ def extract_features(sentence):
         sentence (str): The sentence containing 'it'
 
     Returns:
-        dict: Dictionary of features
+        dict: Dictionary of postion-based features
     """
     # Tokenize the sentence
     tokens = word_tokenize(sentence.lower())
@@ -51,8 +51,6 @@ def process_corpus(file_path):
 
                 features = extract_features(sentence)
                 results.append({
-                    'class': anaphoric_class,
-                    'sentence': sentence,
                     'features': features
                 })
 
