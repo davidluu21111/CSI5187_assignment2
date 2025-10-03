@@ -1,39 +1,111 @@
 import nltk
 from nltk.tokenize import word_tokenize
-
-
+nltk.download('averaged_perceptron_tagger_eng')
+nltk.download('maxent_ne_chunker_tab')
+nltk.download('words')
+import csv
+from nltk import pos_tag, ne_chunk
 def extract_features(sentence):
     """
-    Extract features for the occurrence of 'it' in a sentence.
+    Extract features for all occurrences of 'it' in a sentence.
 
     Args:
         sentence (str): The sentence containing 'it'
 
     Returns:
-        dict: Dictionary of postion-based features
+        list: List of positions (1-indexed) for each occurrence of 'it'
     """
     # Tokenize the sentence
     tokens = word_tokenize(sentence.lower())
 
-    # F1: Position of "it" in the sentence (1-indexed)
-    it_position = None
+    # F1: Positions of all "it" occurrences in the sentence (1-indexed)
+    it_positions = []
     for i, token in enumerate(tokens, start=1):
         if token == 'it':
-            it_position = i
-            break
+            it_positions.append(i)
 
-    return it_position
+    return it_positions
+
+def number_of_tokens(sentence):
+    """
+    Count the number of tokens in a sentence.
+
+    Args:
+        sentence (str): The sentence to be tokenized
+
+    Returns:
+        int: Number of tokens in the sentence
+    """
+    tokens = word_tokenize(sentence)
+    return len(tokens)
+
+def number_of_punctuation(sentence):
+    """
+    Count the number of punctuation marks in a sentence using NLTK POS tagging.
+
+    Args:
+        sentence (str): The sentence to be analyzed
+
+    Returns:
+        int: Number of punctuation marks in the sentence
+    """
+    tokens = word_tokenize(sentence)
+    pos_tags = nltk.pos_tag(tokens)
+    # Count tokens tagged as punctuation (POS tags starting with punctuation symbols)
+    punctuation_count = sum(1 for word, pos in pos_tags if pos in ['.', ',', ':', ';', '!', '?', '-', '--', '...', "''", '``', '(', ')', '[', ']', '{', '}'])
+
+    return punctuation_count
+
+
+def count_preceding_noun_phrases(sentence, it_position):
+    """
+    Count the number of atomic noun phrases that come before a specific instance of 'it'.
+
+    Args:
+        sentence (str): The sentence to be analyzed
+        it_position (int): The position of 'it' in the sentence (1-indexed)
+
+    Returns:
+        int: Number of noun phrases preceding 'it'
+    """
+    tokens = word_tokenize(sentence)
+    pos_tags = nltk.pos_tag(tokens)
+
+    # Use chunking to identify noun phrases
+    # Define a simple grammar for atomic noun phrases
+    grammar = r"""
+        NP: {<DT|PRP\$>?<JJ>*<NN.*>+}
+    """
+    cp = nltk.RegexpParser(grammar)
+    tree = cp.parse(pos_tags)
+
+    # Count noun phrases that appear before the 'it' position
+    np_count = 0
+    token_index = 0
+
+    for subtree in tree:
+        if isinstance(subtree, nltk.Tree) and subtree.label() == 'NP':
+            # Get the position of the last token in this NP
+            np_end_position = token_index + len(subtree)
+            # If this NP ends before our 'it' position, count it
+            if np_end_position < it_position:
+                np_count += 1
+            token_index += len(subtree)
+        else:
+            token_index += 1
+
+    return np_count
 
 
 def process_corpus(file_path):
     """
-    Process the it-corpus.tsv file and extract features for each sentence.
+    Process the it-corpus.tsv file and extract features for each instance of 'it'.
 
     Args:
         file_path (str): Path to the TSV file
 
     Returns:
-        list: List of dictionaries containing features for each sentence
+        list: List of dictionaries containing features for each instance of 'it'
     """
     results = []
 
@@ -47,10 +119,20 @@ def process_corpus(file_path):
                 anaphoric_class = parts[0]
                 sentence = parts[1]
 
-                features = extract_features(sentence)
-                results.append({
-                    'position': features
-                })
+                it_positions = extract_features(sentence)
+                numTokens = number_of_tokens(sentence)
+                numPunc = number_of_punctuation(sentence)
+
+                # Create a separate row for each occurrence of 'it'
+                for position in it_positions:
+                    num_preceding_nps = count_preceding_noun_phrases(sentence, position)
+                    results.append({
+                        'class': anaphoric_class,
+                        'f1_position_it': position,
+                        'f2_num_tokens': numTokens,
+                        'f3_num_punctuation': numPunc,
+                        'f4_num_preceding_nps': num_preceding_nps,
+                    })
 
     return results
 
@@ -58,6 +140,17 @@ def process_corpus(file_path):
 if __name__ == '__main__':
     # Process the corpus
     results = process_corpus('it-corpus.tsv')
-    print("F1 results:")
-    for i, result in enumerate(results, start=1):
-        print(f" {i} :  F1 (Position of 'it'): {result['position']}")
+
+    
+    
+
+    # Export results to CSV
+    with open('features_output.csv', 'w', newline='', encoding='utf-8') as csvfile:
+        fieldnames = ['class', 'f1_position_it', 'f2_num_tokens', 'f3_num_punctuation', 'f4_num_preceding_nps']
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+
+        writer.writeheader()
+        writer.writerows(results)
+
+    print(f"Features extracted and saved to features_output.csv ({len(results)} rows)")
+
