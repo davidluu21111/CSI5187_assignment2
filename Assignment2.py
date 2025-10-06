@@ -156,7 +156,7 @@ def follows_prepositional_phrase(sentence, it_position):
     for subtree in tree:
         if isinstance(subtree, nltk.Tree) and subtree.label() == 'PP':
             pp_end_position = token_index + len(subtree)
-            if pp_end_position + 1 == it_position:
+            if pp_end_position == it_position:
                 return True
             token_index += len(subtree)
         else:
@@ -169,7 +169,7 @@ def preceding_succeeding_pos_tags(sentence, it_position):
     pos_tags = pos_tag(tokens)
 
     before = [
-        pos_tags[i][1] if i >= 0 else "ABS" for i in range(it_position-4, it_position)
+        pos_tags[i][1] if i >= 0 else "ABS" for i in range(it_position-5, it_position-1)
     ]
     after = [
         pos_tags[i][1] if i < len(pos_tags) else "ABS" for i in range(it_position, it_position + 4)
@@ -181,11 +181,56 @@ def followed_by_ing_verb(sentence, it_position):
     tokens = word_tokenize(sentence)
     pos_tags = pos_tag(tokens)
 
-    if it_position + 1 < len(pos_tags): 
-        if pos_tags[it_position+1][1] == 'VBG':
+    if it_position < len(pos_tags): 
+        if pos_tags[it_position][1] == 'VBG':
             return True
     return False
 
+def followed_by_preposition(sentence, it_position):
+    tokens = word_tokenize(sentence)
+    pos_tags = pos_tag(tokens)
+
+    if it_position  < len(pos_tags):
+        if pos_tags[it_position][1] == 'IN':
+            return True
+    return False
+
+def num_adjectives_after(sentence, it_position):
+    tokens = word_tokenize(sentence)
+    pos_tags = pos_tag(tokens)
+
+    count_adj = 0
+    for i in range(it_position, len(pos_tags)):
+        if pos_tags[i][1] == 'JJ' or pos_tags[i][1] == 'JJR' or pos_tags[i][1] == 'JJS':
+            count_adj += 1
+    
+    return count_adj 
+
+def preceded_by_verb(sentence, it_position):
+    tokens = word_tokenize(sentence)
+    pos_tags = pos_tag(tokens)
+
+    if it_position-2 > 0:
+        return pos_tags[it_position-2][1] in ['VB', 'VBD', 'VBG', 'VBN', 'VBP', 'VBZ']
+
+    return False
+
+def followed_by_verb(sentence, it_position):
+    tokens = word_tokenize(sentence)
+    pos_tags = pos_tag(tokens)
+
+    if it_position < len(pos_tags):
+        return pos_tags[it_position][1] in ['VB', 'VBD', 'VBG', 'VBN', 'VBP', 'VBZ']
+    return False
+
+def followed_by_adj(sentence, it_position):
+    tokens = word_tokenize(sentence)
+    pos_tags = pos_tag(tokens)
+
+    if it_position < len(pos_tags):
+        return pos_tags[it_position][1] in ['JJ', 'JJR', 'JJS']
+
+    return False
 
 def process_corpus(file_path):
     """
@@ -220,6 +265,11 @@ def process_corpus(file_path):
                     prepositional_phrase = follows_prepositional_phrase(sentence, position)
                     pos_tags_preceding_and_succeeding = preceding_succeeding_pos_tags(sentence, position)
                     ing_verb = followed_by_ing_verb(sentence, position)
+                    preposition = followed_by_preposition(sentence, position)
+                    adjectives_after = num_adjectives_after(sentence, position)
+                    verb_preceding = preceded_by_verb(sentence, position)
+                    verb_following = followed_by_verb(sentence, position)
+                    adj_following = followed_by_adj(sentence, position)
                     results.append({
                         'class': anaphoric_class,
                         'f1_position_it': position,
@@ -229,7 +279,12 @@ def process_corpus(file_path):
                         'f5_num_following_nps': num_following_nps,
                         'f6_prepositional_phrase': prepositional_phrase,
                         'f7_pos_tags_preceding_and_succeeding': pos_tags_preceding_and_succeeding,
-                        'f8_ing_verb': ing_verb
+                        'f8_ing_verb': ing_verb,
+                        'f9_preposition': preposition,
+                        'f10_num_adjectives_after': adjectives_after,
+                        'f11_verb_preceding': verb_preceding,
+                        'f12_verb_following': verb_following,
+                        'f13_adj_following': adj_following
                     })
 
     return results
@@ -244,7 +299,8 @@ if __name__ == '__main__':
 
     # Export results to CSV
     with open('features_output.csv', 'w', newline='', encoding='utf-8') as csvfile:
-        fieldnames = ['class', 'f1_position_it', 'f2_num_tokens', 'f3_num_punctuation', 'f4_num_preceding_nps', 'f5_num_following_nps', 'f6_prepositional_phrase', 'f7_pos_tags_preceding_and_succeeding', 'f8_ing_verb']
+        fieldnames = ['class', 'f1_position_it', 'f2_num_tokens', 'f3_num_punctuation', 'f4_num_preceding_nps', 'f5_num_following_nps', 'f6_prepositional_phrase', 'f7_pos_tags_preceding_and_succeeding', 'f8_ing_verb', 'f9_preposition',
+                      'f10_num_adjectives_after', 'f11_verb_preceding', 'f12_verb_following', 'f13_adj_following']
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
 
         writer.writeheader()
