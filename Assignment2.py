@@ -232,6 +232,51 @@ def followed_by_adj(sentence, it_position):
 
     return False
 
+def np_after_it_contains_adj(sentence, it_position):
+    
+    tokens = word_tokenize(sentence)
+    pos_tags = nltk.pos_tag(tokens)
+
+    # Define grammar for noun phrases that can contain adjectives
+    grammar = r"""
+        NP: {<DT|PRP\$>?<JJ>*<NN.*>+}
+    """
+    cp = nltk.RegexpParser(grammar)
+    tree = cp.parse(pos_tags)
+
+    token_index = 0
+
+    for subtree in tree:
+        if isinstance(subtree, nltk.Tree) and subtree.label() == 'NP':
+            np_start_position = token_index + 1  # Convert to 1-indexed
+
+            # Check if this NP comes after 'it'
+            if np_start_position > it_position:
+                # Check if this NP contains an adjective
+                for _, pos in subtree:
+                    if pos in ['JJ', 'JJR', 'JJS']:
+                        return True  # Return True as soon as we find any NP with adjective
+
+            token_index += len(subtree)
+        else:
+            token_index += 1
+
+    return False  # No NP after 'it' contains an adjective
+
+def tokens_before_infinitive(sentence):
+    
+    tokens = word_tokenize(sentence)
+    pos_tags = pos_tag(tokens)
+
+    # Search for first infinitive (TO + VB) in the entire sentence
+    for i in range(0, len(pos_tags) - 1):  # -1 because we need to check i+1
+        if pos_tags[i][1] == 'TO' and pos_tags[i+1][1] == 'VB':
+            # Found infinitive at position i (0-indexed)
+            # Return the number of tokens before "TO" (which is at index i, so i tokens before it)
+            return i
+
+    return 0
+
 def process_corpus(file_path):
     """
     Process the it-corpus.tsv file and extract features for each instance of 'it'.
@@ -270,6 +315,8 @@ def process_corpus(file_path):
                     verb_preceding = preceded_by_verb(sentence, position)
                     verb_following = followed_by_verb(sentence, position)
                     adj_following = followed_by_adj(sentence, position)
+                    np_contains_adj = np_after_it_contains_adj(sentence, position)
+                    tokens_before_inf = tokens_before_infinitive(sentence)
                     results.append({
                         'class': anaphoric_class,
                         'f1_position_it': position,
@@ -284,7 +331,9 @@ def process_corpus(file_path):
                         'f10_num_adjectives_after': adjectives_after,
                         'f11_verb_preceding': verb_preceding,
                         'f12_verb_following': verb_following,
-                        'f13_adj_following': adj_following
+                        'f13_adj_following': adj_following,
+                        'f14_np_after_it_contains_adj': np_contains_adj,
+                        'f15_tokens_before_infinitive': tokens_before_inf
                     })
 
     return results
@@ -300,7 +349,7 @@ if __name__ == '__main__':
     # Export results to CSV
     with open('features_output.csv', 'w', newline='', encoding='utf-8') as csvfile:
         fieldnames = ['class', 'f1_position_it', 'f2_num_tokens', 'f3_num_punctuation', 'f4_num_preceding_nps', 'f5_num_following_nps', 'f6_prepositional_phrase', 'f7_pos_tags_preceding_and_succeeding', 'f8_ing_verb', 'f9_preposition',
-                      'f10_num_adjectives_after', 'f11_verb_preceding', 'f12_verb_following', 'f13_adj_following']
+                      'f10_num_adjectives_after', 'f11_verb_preceding', 'f12_verb_following', 'f13_adj_following', 'f14_np_after_it_contains_adj', 'f15_tokens_before_infinitive']
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
 
         writer.writeheader()
