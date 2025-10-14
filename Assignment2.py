@@ -232,37 +232,6 @@ def followed_by_adj(sentence, it_position):
 
     return False
 
-def np_after_it_contains_adj(sentence, it_position):
-
-    tokens = word_tokenize(sentence)
-    pos_tags = nltk.pos_tag(tokens)
-
-    # Define grammar for noun phrases that can contain adjectives
-    grammar = r"""
-        NP: {<DT|PRP\$>?<JJ>*<NN.*>+}
-    """
-    cp = nltk.RegexpParser(grammar)
-    tree = cp.parse(pos_tags)
-
-    token_index = 0
-
-    for subtree in tree:
-        if isinstance(subtree, nltk.Tree) and subtree.label() == 'NP':
-            np_start_position = token_index + 1  # Convert to 1-indexed
-
-            # Check if this NP comes after 'it'
-            if np_start_position > it_position:
-                # Check if this NP contains an adjective
-                for _, pos in subtree:
-                    if pos in ['JJ', 'JJR', 'JJS']:
-                        return True  # Return True as soon as we find any NP with adjective
-
-            token_index += len(subtree)
-        else:
-            token_index += 1
-
-    return False  # No NP after 'it' contains an adjective
-
 def process_corpus(file_path):
     """
     Process the it-corpus.tsv file and extract features for each instance of 'it'.
@@ -301,7 +270,6 @@ def process_corpus(file_path):
                     verb_preceding = preceded_by_verb(sentence, position)
                     verb_following = followed_by_verb(sentence, position)
                     adj_following = followed_by_adj(sentence, position)
-                    np_contains_adj = np_after_it_contains_adj(sentence, position)
                     results.append({
                         'class': anaphoric_class,
                         'f1_position_it': position,
@@ -316,8 +284,7 @@ def process_corpus(file_path):
                         'f10_num_adjectives_after': adjectives_after,
                         'f11_verb_preceding': verb_preceding,
                         'f12_verb_following': verb_following,
-                        'f13_adj_following': adj_following,
-                        'f14_np_after_it_contains_adj': np_contains_adj
+                        'f13_adj_following': adj_following
                     })
 
     return results
@@ -333,10 +300,11 @@ if __name__ == '__main__':
     # Export results to CSV
     with open('features_output.csv', 'w', newline='', encoding='utf-8') as csvfile:
         fieldnames = ['class', 'f1_position_it', 'f2_num_tokens', 'f3_num_punctuation', 'f4_num_preceding_nps', 'f5_num_following_nps', 'f6_prepositional_phrase', 'f7_pos_tags_preceding_and_succeeding', 'f8_ing_verb', 'f9_preposition',
-                      'f10_num_adjectives_after', 'f11_verb_preceding', 'f12_verb_following', 'f13_adj_following', 'f14_np_after_it_contains_adj']
+                      'f10_num_adjectives_after', 'f11_verb_preceding', 'f12_verb_following', 'f13_adj_following']
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
 
         writer.writeheader()
         writer.writerows(results)
 
     print(f"Features extracted and saved to features_output.csv ({len(results)} rows)")
+
