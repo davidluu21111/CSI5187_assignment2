@@ -96,6 +96,172 @@ def count_preceding_noun_phrases(sentence, it_position):
 
     return np_count
 
+def count_following_noun_phrases(sentence, it_position):
+    '''
+    Count the number of atomic noun phrases that come after a specific instance of "it"
+
+    Args:
+        sentence (str): The sentence to ne analyzed
+        it_position (int): The positon of "it" in the sentence (1-indexed)
+    
+    Returns:
+        int: Number of noun phrases following "it"
+    '''
+    tokens = word_tokenize(sentence)
+    pos_tags = nltk.pos_tag(tokens)
+
+    grammar = r"""
+        NP: {<DT|PRP\$>?<JJ>*<NN.*>+}
+    """
+    cp = nltk.RegexpParser(grammar)
+    tree = cp.parse(pos_tags)
+
+    np_count = 0
+    token_index = 0
+
+    for subtree in tree:
+        if isinstance(subtree, nltk.Tree) and subtree.label() == 'NP':
+            np_end_position = token_index + len(subtree)
+            if np_end_position > it_position:
+                np_count += 1
+            token_index += len(subtree)
+        else:
+            token_index += 1
+    
+    return np_count
+
+def follows_prepositional_phrase(sentence, it_position):
+    '''
+    Determines whether a specific instance of "it" immediately follows a prepositional phrase
+
+    Args:
+        sentence(str): The sentence to be analyzed
+        it_positon(int): The positon of "it" in the sentence (1-indexed)
+    
+    Returns:
+        bool: True if "it" immediately follows a prepositional phrase, false otherwise
+    '''
+    tokens = word_tokenize(sentence)
+    pos_tags = nltk.pos_tag(tokens)
+
+    grammar = r"""
+        PP:{<IN><DT|PRP\$>?<JJ>*<NN.*>+}
+    """
+
+    cp = nltk.RegexpParser(grammar)
+    tree = cp.parse(pos_tags)
+
+    token_index = 0
+
+    for subtree in tree:
+        if isinstance(subtree, nltk.Tree) and subtree.label() == 'PP':
+            pp_end_position = token_index + len(subtree)
+            if pp_end_position == it_position:
+                return True
+            token_index += len(subtree)
+        else:
+            token_index += 1
+    
+    return False
+
+def preceding_succeeding_pos_tags(sentence, it_position):
+    tokens = word_tokenize(sentence)
+    pos_tags = pos_tag(tokens)
+
+    before = [
+        pos_tags[i][1] if i >= 0 else "ABS" for i in range(it_position-5, it_position-1)
+    ]
+    after = [
+        pos_tags[i][1] if i < len(pos_tags) else "ABS" for i in range(it_position, it_position + 4)
+    ]
+
+    return before+after
+
+def followed_by_ing_verb(sentence, it_position):
+    tokens = word_tokenize(sentence)
+    pos_tags = pos_tag(tokens)
+
+    if it_position < len(pos_tags): 
+        if pos_tags[it_position][1] == 'VBG':
+            return True
+    return False
+
+def followed_by_preposition(sentence, it_position):
+    tokens = word_tokenize(sentence)
+    pos_tags = pos_tag(tokens)
+
+    if it_position  < len(pos_tags):
+        if pos_tags[it_position][1] == 'IN':
+            return True
+    return False
+
+def num_adjectives_after(sentence, it_position):
+    tokens = word_tokenize(sentence)
+    pos_tags = pos_tag(tokens)
+
+    count_adj = 0
+    for i in range(it_position, len(pos_tags)):
+        if pos_tags[i][1] == 'JJ' or pos_tags[i][1] == 'JJR' or pos_tags[i][1] == 'JJS':
+            count_adj += 1
+    
+    return count_adj 
+
+def preceded_by_verb(sentence, it_position):
+    tokens = word_tokenize(sentence)
+    pos_tags = pos_tag(tokens)
+
+    if it_position-2 > 0:
+        return pos_tags[it_position-2][1] in ['VB', 'VBD', 'VBG', 'VBN', 'VBP', 'VBZ']
+
+    return False
+
+def followed_by_verb(sentence, it_position):
+    tokens = word_tokenize(sentence)
+    pos_tags = pos_tag(tokens)
+
+    if it_position < len(pos_tags):
+        return pos_tags[it_position][1] in ['VB', 'VBD', 'VBG', 'VBN', 'VBP', 'VBZ']
+    return False
+
+def followed_by_adj(sentence, it_position):
+    tokens = word_tokenize(sentence)
+    pos_tags = pos_tag(tokens)
+
+    if it_position < len(pos_tags):
+        return pos_tags[it_position][1] in ['JJ', 'JJR', 'JJS']
+
+    return False
+
+def np_after_it_contains_adj(sentence, it_position):
+
+    tokens = word_tokenize(sentence)
+    pos_tags = nltk.pos_tag(tokens)
+
+    # Define grammar for noun phrases that can contain adjectives
+    grammar = r"""
+        NP: {<DT|PRP\$>?<JJ>*<NN.*>+}
+    """
+    cp = nltk.RegexpParser(grammar)
+    tree = cp.parse(pos_tags)
+
+    token_index = 0
+
+    for subtree in tree:
+        if isinstance(subtree, nltk.Tree) and subtree.label() == 'NP':
+            np_start_position = token_index + 1  # Convert to 1-indexed
+
+            # Check if this NP comes after 'it'
+            if np_start_position > it_position:
+                # Check if this NP contains an adjective
+                for _, pos in subtree:
+                    if pos in ['JJ', 'JJR', 'JJS']:
+                        return True  # Return True as soon as we find any NP with adjective
+
+            token_index += len(subtree)
+        else:
+            token_index += 1
+
+    return False  # No NP after 'it' contains an adjective
 
 def process_corpus(file_path):
     """
@@ -126,12 +292,32 @@ def process_corpus(file_path):
                 # Create a separate row for each occurrence of 'it'
                 for position in it_positions:
                     num_preceding_nps = count_preceding_noun_phrases(sentence, position)
+                    num_following_nps = count_following_noun_phrases(sentence, position)
+                    prepositional_phrase = follows_prepositional_phrase(sentence, position)
+                    pos_tags_preceding_and_succeeding = preceding_succeeding_pos_tags(sentence, position)
+                    ing_verb = followed_by_ing_verb(sentence, position)
+                    preposition = followed_by_preposition(sentence, position)
+                    adjectives_after = num_adjectives_after(sentence, position)
+                    verb_preceding = preceded_by_verb(sentence, position)
+                    verb_following = followed_by_verb(sentence, position)
+                    adj_following = followed_by_adj(sentence, position)
+                    np_contains_adj = np_after_it_contains_adj(sentence, position)
                     results.append({
                         'class': anaphoric_class,
                         'f1_position_it': position,
                         'f2_num_tokens': numTokens,
                         'f3_num_punctuation': numPunc,
                         'f4_num_preceding_nps': num_preceding_nps,
+                        'f5_num_following_nps': num_following_nps,
+                        'f6_prepositional_phrase': prepositional_phrase,
+                        'f7_pos_tags_preceding_and_succeeding': pos_tags_preceding_and_succeeding,
+                        'f8_ing_verb': ing_verb,
+                        'f9_preposition': preposition,
+                        'f10_num_adjectives_after': adjectives_after,
+                        'f11_verb_preceding': verb_preceding,
+                        'f12_verb_following': verb_following,
+                        'f13_adj_following': adj_following,
+                        'f14_np_after_it_contains_adj': np_contains_adj
                     })
 
     return results
@@ -146,11 +332,11 @@ if __name__ == '__main__':
 
     # Export results to CSV
     with open('features_output.csv', 'w', newline='', encoding='utf-8') as csvfile:
-        fieldnames = ['class', 'f1_position_it', 'f2_num_tokens', 'f3_num_punctuation', 'f4_num_preceding_nps']
+        fieldnames = ['class', 'f1_position_it', 'f2_num_tokens', 'f3_num_punctuation', 'f4_num_preceding_nps', 'f5_num_following_nps', 'f6_prepositional_phrase', 'f7_pos_tags_preceding_and_succeeding', 'f8_ing_verb', 'f9_preposition',
+                      'f10_num_adjectives_after', 'f11_verb_preceding', 'f12_verb_following', 'f13_adj_following', 'f14_np_after_it_contains_adj']
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
 
         writer.writeheader()
         writer.writerows(results)
 
     print(f"Features extracted and saved to features_output.csv ({len(results)} rows)")
-
