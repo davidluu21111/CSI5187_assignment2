@@ -271,8 +271,6 @@ def tokens_before_infinitive(sentence):
     # Search for first infinitive (TO + VB) in the entire sentence
     for i in range(0, len(pos_tags) - 1):  # -1 because we need to check i+1
         if pos_tags[i][1] == 'TO' and pos_tags[i+1][1] == 'VB':
-            # Found infinitive at position i (0-indexed)
-            # Return the number of tokens before "TO" (which is at index i, so i tokens before it)
             return i
 
     return 0
