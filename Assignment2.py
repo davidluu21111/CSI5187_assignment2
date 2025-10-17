@@ -1,10 +1,15 @@
 import nltk
 from nltk.tokenize import word_tokenize
+from nltk.corpus import wordnet as wn
 nltk.download('averaged_perceptron_tagger_eng')
-nltk.download('maxent_ne_chunker_tab')
-nltk.download('words')
+nltk.download('wordnet')
+nltk.download('omw-1.4')
 import csv
-from nltk import pos_tag, ne_chunk
+from nltk import pos_tag
+import spacy
+
+# Load spaCy model for dependency parsing
+nlp = spacy.load("en_core_web_sm")
 def extract_features(sentence):
     """
     Extract features for all occurrences of 'it' in a sentence.
@@ -264,7 +269,7 @@ def np_after_it_contains_adj(sentence, it_position):
     return False  # No NP after 'it' contains an adjective
 
 def tokens_before_infinitive(sentence):
-    
+
     tokens = word_tokenize(sentence)
     pos_tags = pos_tag(tokens)
 
@@ -274,6 +279,139 @@ def tokens_before_infinitive(sentence):
             return i
 
     return 0
+
+def tokens_between_it_and_preposition(sentence, it_position):
+
+    tokens = word_tokenize(sentence)
+    pos_tags = pos_tag(tokens)
+
+    for i in range(it_position, len(pos_tags)):
+        if pos_tags[i][1] == 'IN':
+            return i - it_position
+
+    return 0
+
+def adj_np_after_it(sentence, it_position):
+
+    tokens = word_tokenize(sentence)
+    pos_tags = nltk.pos_tag(tokens)
+
+    grammar = r"""
+        NP: {<DT|PRP\$>?<JJ>*<NN.*>+}
+    """
+    cp = nltk.RegexpParser(grammar)
+    tree = cp.parse(pos_tags)
+
+    token_index = 0
+    found_adj = False
+
+    for subtree in tree:
+        if isinstance(subtree, nltk.Tree) and subtree.label() == 'NP':
+            np_start_position = token_index + 1
+
+            if np_start_position > it_position:
+                for _, pos in subtree:
+                    if pos in ['JJ', 'JJR', 'JJS']:
+                        return True
+
+            token_index += len(subtree)
+        else:
+            if token_index + 1 > it_position and pos_tags[token_index][1] in ['JJ', 'JJR', 'JJS']:
+                found_adj = True
+            token_index += 1
+
+    return False
+
+def dependency_relation_type(sentence, it_position):
+    
+    # Parse the sentence with spaCy
+    doc = nlp(sentence)
+
+    # Convert NLTK tokens to find the correct 'it' token in spaCy
+    nltk_tokens = word_tokenize(sentence.lower())
+
+    it_count = 0
+    target_it_index = None
+    for i, token in enumerate(nltk_tokens):
+        if token == 'it':
+            it_count += 1
+            if it_count == it_position:  # This assumes it_position counts which 'it' we want
+                target_it_index = i
+                break
+
+    if target_it_index is None:
+        target_it_index = it_position - 1
+
+    
+    it_token = None
+    spacy_idx = 0
+    for nltk_idx, nltk_tok in enumerate(nltk_tokens):
+        # Find corresponding spaCy token
+        if spacy_idx < len(doc):
+            spacy_tok = doc[spacy_idx]
+            # Match tokens (case-insensitive)
+            if nltk_tok.lower() == spacy_tok.text.lower():
+                if nltk_idx == target_it_index:
+                    it_token = spacy_tok
+                    break
+                spacy_idx += 1
+            else:
+                # Handle tokenization differences
+                spacy_idx += 1
+
+    
+    if it_token is None:
+        it_tokens = [token for token in doc if token.text.lower() == 'it']
+        if it_tokens:
+            # Use position to select the right 'it' if multiple exist
+            it_index = min(it_position - 1, len(it_tokens) - 1)
+            it_token = it_tokens[it_index]
+
+    if it_token is None:
+        return "NONE"
+
+    # Check if 'it' is a dependent 
+    if it_token.dep_ == 'ROOT':
+        return "NONE"
+
+    
+    return it_token.dep_
+
+def is_weather_verb_following(sentence, it_position):
+
+    tokens = word_tokenize(sentence)
+    pos_tags = pos_tag(tokens)
+
+    if it_position < len(pos_tags):
+        if pos_tags[it_position][1] in ['VB', 'VBD', 'VBG', 'VBN', 'VBP', 'VBZ']:
+            verb = pos_tags[it_position][0].lower()
+            try:
+                from nltk.corpus import wordnet as wn
+                synsets = wn.synsets(verb, pos=wn.VERB)
+                for synset in synsets:
+                    if synset.lexname() == 'verb.weather':
+                        return True
+            except:
+                pass
+    return False
+
+def is_cognitive_verb_following(sentence, it_position):
+
+    tokens = word_tokenize(sentence)
+    pos_tags = pos_tag(tokens)
+
+    if it_position < len(pos_tags):
+        if pos_tags[it_position][1] in ['VB', 'VBD', 'VBG', 'VBN', 'VBP', 'VBZ']:
+            verb = pos_tags[it_position][0].lower()
+            try:
+                from nltk.corpus import wordnet as wn
+                synsets = wn.synsets(verb, pos=wn.VERB)
+                for synset in synsets:
+                    if synset.lexname() == 'verb.cognition':
+                        return True
+            except:
+                pass
+    return False
 
 def process_corpus(file_path):
     """
@@ -315,6 +453,11 @@ def process_corpus(file_path):
                     adj_following = followed_by_adj(sentence, position)
                     np_contains_adj = np_after_it_contains_adj(sentence, position)
                     tokens_before_inf = tokens_before_infinitive(sentence)
+                    tokens_to_prep = tokens_between_it_and_preposition(sentence, position)
+                    adj_np_following = adj_np_after_it(sentence, position)
+                    dep_relation = dependency_relation_type(sentence, position)
+                    weather_verb = is_weather_verb_following(sentence, position)
+                    cognitive_verb = is_cognitive_verb_following(sentence, position)
                     results.append({
                         'class': anaphoric_class,
                         'f1_position_it': position,
@@ -331,7 +474,12 @@ def process_corpus(file_path):
                         'f12_verb_following': verb_following,
                         'f13_adj_following': adj_following,
                         'f14_np_after_it_contains_adj': np_contains_adj,
-                        'f15_tokens_before_infinitive': tokens_before_inf
+                        'f15_tokens_before_infinitive': tokens_before_inf,
+                        'f16_tokens_between_it_and_prep': tokens_to_prep,
+                        'f17_adj_np_after_it': adj_np_following,
+                        'f18_dependency_relation': dep_relation,
+                        'f19_weather_verb': weather_verb,
+                        'f20_cognitive_verb': cognitive_verb
                     })
 
     return results
@@ -347,7 +495,7 @@ if __name__ == '__main__':
     # Export results to CSV
     with open('features_output.csv', 'w', newline='', encoding='utf-8') as csvfile:
         fieldnames = ['class', 'f1_position_it', 'f2_num_tokens', 'f3_num_punctuation', 'f4_num_preceding_nps', 'f5_num_following_nps', 'f6_prepositional_phrase', 'f7_pos_tags_preceding_and_succeeding', 'f8_ing_verb', 'f9_preposition',
-                      'f10_num_adjectives_after', 'f11_verb_preceding', 'f12_verb_following', 'f13_adj_following', 'f14_np_after_it_contains_adj', 'f15_tokens_before_infinitive']
+                      'f10_num_adjectives_after', 'f11_verb_preceding', 'f12_verb_following', 'f13_adj_following', 'f14_np_after_it_contains_adj', 'f15_tokens_before_infinitive', 'f16_tokens_between_it_and_prep', 'f17_adj_np_after_it', 'f18_dependency_relation', 'f19_weather_verb', 'f20_cognitive_verb']
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
 
         writer.writeheader()
