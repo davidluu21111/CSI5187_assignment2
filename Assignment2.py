@@ -106,7 +106,7 @@ def count_following_noun_phrases(sentence, it_position):
     Count the number of atomic noun phrases that come after a specific instance of "it"
 
     Args:
-        sentence (str): The sentence to ne analyzed
+        sentence (str): The sentence to be analyzed
         it_position (int): The positon of "it" in the sentence (1-indexed)
     
     Returns:
@@ -126,8 +126,8 @@ def count_following_noun_phrases(sentence, it_position):
 
     for subtree in tree:
         if isinstance(subtree, nltk.Tree) and subtree.label() == 'NP':
-            np_end_position = token_index + len(subtree)
-            if np_end_position > it_position:
+            np_start_position = token_index + 1
+            if np_start_position > it_position:
                 np_count += 1
             token_index += len(subtree)
         else:
@@ -161,7 +161,8 @@ def follows_prepositional_phrase(sentence, it_position):
     for subtree in tree:
         if isinstance(subtree, nltk.Tree) and subtree.label() == 'PP':
             pp_end_position = token_index + len(subtree)
-            if pp_end_position == it_position:
+            #print(pp_end_position, it_position)
+            if pp_end_position == it_position + 1:
                 return True
             token_index += len(subtree)
         else:
@@ -268,14 +269,14 @@ def np_after_it_contains_adj(sentence, it_position):
 
     return False  # No NP after 'it' contains an adjective
 
-def tokens_before_infinitive(sentence):
+def tokens_before_infinitive(sentence, it_position):
 
     tokens = word_tokenize(sentence)
     pos_tags = pos_tag(tokens)
 
     # Search for first infinitive (TO + VB) in the entire sentence
     for i in range(0, len(pos_tags) - 1):  # -1 because we need to check i+1
-        if pos_tags[i][1] == 'TO' and pos_tags[i+1][1] == 'VB':
+        if pos_tags[i][1] == 'TO' and pos_tags[i+1][1] == 'VB' and i >= it_position:
             return i
 
     return 0
@@ -292,35 +293,56 @@ def tokens_between_it_and_preposition(sentence, it_position):
     return 0
 
 def adj_np_after_it(sentence, it_position):
-
     tokens = word_tokenize(sentence)
     pos_tags = nltk.pos_tag(tokens)
 
     grammar = r"""
-        NP: {<DT|PRP\$>?<JJ>*<NN.*>+}
+        ADJNP: {<JJ|JJR|JJS>+<DT|PRP\$>?<JJ>*<NN.*>+}
     """
+
     cp = nltk.RegexpParser(grammar)
     tree = cp.parse(pos_tags)
 
     token_index = 0
-    found_adj = False
-
     for subtree in tree:
-        if isinstance(subtree, nltk.Tree) and subtree.label() == 'NP':
+        if isinstance(subtree, nltk.Tree) and subtree.label() == 'ADJNP':
             np_start_position = token_index + 1
-
             if np_start_position > it_position:
-                for _, pos in subtree:
-                    if pos in ['JJ', 'JJR', 'JJS']:
-                        return True
-
-            token_index += len(subtree)
-        else:
-            if token_index + 1 > it_position and pos_tags[token_index][1] in ['JJ', 'JJR', 'JJS']:
-                found_adj = True
-            token_index += 1
-
+                return True
+    
     return False
+
+
+#  def adj_np_after_it(sentence, it_position):
+
+#     tokens = word_tokenize(sentence)
+#     pos_tags = nltk.pos_tag(tokens)
+
+#     grammar = r"""
+#         NP: {<DT|PRP\$>?<JJ>*<NN.*>+}
+#     """
+#     cp = nltk.RegexpParser(grammar)
+#     tree = cp.parse(pos_tags)
+
+#     token_index = 0
+#     found_adj = False
+
+#     for subtree in tree:
+#         if isinstance(subtree, nltk.Tree) and subtree.label() == 'NP':
+#             np_start_position = token_index + 1
+
+#             if np_start_position > it_position:
+#                 for _, pos in subtree:
+#                     if pos in ['JJ', 'JJR', 'JJS']:
+#                         return True
+
+#             token_index += len(subtree)
+#         else:
+#             if token_index + 1 > it_position and pos_tags[token_index][1] in ['JJ', 'JJR', 'JJS']:
+#                 found_adj = True
+#             token_index += 1
+
+#     return False 
 
 def dependency_relation_type(sentence, it_position):
     
@@ -452,7 +474,7 @@ def process_corpus(file_path):
                     verb_following = followed_by_verb(sentence, position)
                     adj_following = followed_by_adj(sentence, position)
                     np_contains_adj = np_after_it_contains_adj(sentence, position)
-                    tokens_before_inf = tokens_before_infinitive(sentence)
+                    tokens_before_inf = tokens_before_infinitive(sentence, position)
                     tokens_to_prep = tokens_between_it_and_preposition(sentence, position)
                     adj_np_following = adj_np_after_it(sentence, position)
                     dep_relation = dependency_relation_type(sentence, position)
