@@ -8,7 +8,6 @@ import csv
 from nltk import pos_tag
 import spacy
 
-# Load spaCy model for dependency parsing
 nlp = spacy.load("en_core_web_sm")
 def extract_features(sentence):
     """
@@ -20,10 +19,8 @@ def extract_features(sentence):
     Returns:
         list: List of positions (1-indexed) for each occurrence of 'it'
     """
-    # Tokenize the sentence
     tokens = word_tokenize(sentence.lower())
 
-    # F1: Positions of all "it" occurrences in the sentence (1-indexed)
     it_positions = []
     for i, token in enumerate(tokens, start=1):
         if token == 'it':
@@ -56,7 +53,6 @@ def number_of_punctuation(sentence):
     """
     tokens = word_tokenize(sentence)
     pos_tags = nltk.pos_tag(tokens)
-    # Count tokens tagged as punctuation (POS tags starting with punctuation symbols)
     punctuation_count = sum(1 for word, pos in pos_tags if pos in ['.', ',', ':', ';', '!', '?', '-', '--', '...', "''", '``', '(', ')', '[', ']', '{', '}'])
 
     return punctuation_count
@@ -76,23 +72,18 @@ def count_preceding_noun_phrases(sentence, it_position):
     tokens = word_tokenize(sentence)
     pos_tags = nltk.pos_tag(tokens)
 
-    # Use chunking to identify noun phrases
-    # Define a simple grammar for atomic noun phrases
     grammar = r"""
         NP: {<DT|PRP\$>?<JJ>*<NN.*>+}
     """
     cp = nltk.RegexpParser(grammar)
     tree = cp.parse(pos_tags)
 
-    # Count noun phrases that appear before the 'it' position
     np_count = 0
     token_index = 0
 
     for subtree in tree:
         if isinstance(subtree, nltk.Tree) and subtree.label() == 'NP':
-            # Get the position of the last token in this NP
             np_end_position = token_index + len(subtree)
-            # If this NP ends before our 'it' position, count it
             if np_end_position < it_position:
                 np_count += 1
             token_index += len(subtree)
@@ -161,7 +152,6 @@ def follows_prepositional_phrase(sentence, it_position):
     for subtree in tree:
         if isinstance(subtree, nltk.Tree) and subtree.label() == 'PP':
             pp_end_position = token_index + len(subtree)
-            #print(pp_end_position, it_position)
             if pp_end_position == it_position + 1:
                 return True
             token_index += len(subtree)
@@ -243,7 +233,6 @@ def np_after_it_contains_adj(sentence, it_position):
     tokens = word_tokenize(sentence)
     pos_tags = nltk.pos_tag(tokens)
 
-    # Define grammar for noun phrases that can contain adjectives
     grammar = r"""
         NP: {<DT|PRP\$>?<JJ>*<NN.*>+}
     """
@@ -256,9 +245,7 @@ def np_after_it_contains_adj(sentence, it_position):
         if isinstance(subtree, nltk.Tree) and subtree.label() == 'NP':
             np_start_position = token_index + 1  # Convert to 1-indexed
 
-            # Check if this NP comes after 'it'
             if np_start_position > it_position:
-                # Check if this NP contains an adjective
                 for _, pos in subtree:
                     if pos in ['JJ', 'JJR', 'JJS']:
                         return True  # Return True as soon as we find any NP with adjective
@@ -274,7 +261,6 @@ def tokens_before_infinitive(sentence, it_position):
     tokens = word_tokenize(sentence)
     pos_tags = pos_tag(tokens)
 
-    # Search for first infinitive (TO + VB) in the entire sentence
     for i in range(0, len(pos_tags) - 1):  # -1 because we need to check i+1
         if pos_tags[i][1] == 'TO' and pos_tags[i+1][1] == 'VB' and i >= it_position:
             return i
@@ -312,91 +298,29 @@ def adj_np_after_it(sentence, it_position):
     
     return False
 
-
-#  def adj_np_after_it(sentence, it_position):
-
-#     tokens = word_tokenize(sentence)
-#     pos_tags = nltk.pos_tag(tokens)
-
-#     grammar = r"""
-#         NP: {<DT|PRP\$>?<JJ>*<NN.*>+}
-#     """
-#     cp = nltk.RegexpParser(grammar)
-#     tree = cp.parse(pos_tags)
-
-#     token_index = 0
-#     found_adj = False
-
-#     for subtree in tree:
-#         if isinstance(subtree, nltk.Tree) and subtree.label() == 'NP':
-#             np_start_position = token_index + 1
-
-#             if np_start_position > it_position:
-#                 for _, pos in subtree:
-#                     if pos in ['JJ', 'JJR', 'JJS']:
-#                         return True
-
-#             token_index += len(subtree)
-#         else:
-#             if token_index + 1 > it_position and pos_tags[token_index][1] in ['JJ', 'JJR', 'JJS']:
-#                 found_adj = True
-#             token_index += 1
-
-#     return False 
-
 def dependency_relation_type(sentence, it_position):
-    
-    # Parse the sentence with spaCy
+    """
+    F18: Get the dependency relation type with the closest word to which 'it' is associated as a dependent.
+
+    Args:
+        sentence (str): The sentence to be analyzed
+        it_position (int): The position of 'it' in the sentence (1-indexed)
+
+    Returns:
+        str: The dependency relation label (e.g., 'nsubj', 'dobj') or 'NONE' if not found/is ROOT
+    """
     doc = nlp(sentence)
 
-    # Convert NLTK tokens to find the correct 'it' token in spaCy
-    nltk_tokens = word_tokenize(sentence.lower())
+    it_tokens = [(token, token.i) for token in doc if token.text.lower() == 'it']
 
-    it_count = 0
-    target_it_index = None
-    for i, token in enumerate(nltk_tokens):
-        if token == 'it':
-            it_count += 1
-            if it_count == it_position:  # This assumes it_position counts which 'it' we want
-                target_it_index = i
-                break
-
-    if target_it_index is None:
-        target_it_index = it_position - 1
-
-    
-    it_token = None
-    spacy_idx = 0
-    for nltk_idx, nltk_tok in enumerate(nltk_tokens):
-        # Find corresponding spaCy token
-        if spacy_idx < len(doc):
-            spacy_tok = doc[spacy_idx]
-            # Match tokens (case-insensitive)
-            if nltk_tok.lower() == spacy_tok.text.lower():
-                if nltk_idx == target_it_index:
-                    it_token = spacy_tok
-                    break
-                spacy_idx += 1
-            else:
-                # Handle tokenization differences
-                spacy_idx += 1
-
-    
-    if it_token is None:
-        it_tokens = [token for token in doc if token.text.lower() == 'it']
-        if it_tokens:
-            # Use position to select the right 'it' if multiple exist
-            it_index = min(it_position - 1, len(it_tokens) - 1)
-            it_token = it_tokens[it_index]
-
-    if it_token is None:
+    if not it_tokens or it_position > len(it_tokens):
         return "NONE"
 
-    # Check if 'it' is a dependent 
+    it_token, _ = it_tokens[it_position - 1]
+
     if it_token.dep_ == 'ROOT':
         return "NONE"
 
-    
     return it_token.dep_
 
 def is_weather_verb_following(sentence, it_position):
@@ -448,7 +372,6 @@ def process_corpus(file_path):
     results = []
 
     with open(file_path, 'r', encoding='utf-8') as f:
-        # Skip header
         next(f)
 
         for line in f:
@@ -461,8 +384,7 @@ def process_corpus(file_path):
                 numTokens = number_of_tokens(sentence)
                 numPunc = number_of_punctuation(sentence)
 
-                # Create a separate row for each occurrence of 'it'
-                for position in it_positions:
+                for it_occurrence, position in enumerate(it_positions, start=1):
                     num_preceding_nps = count_preceding_noun_phrases(sentence, position)
                     num_following_nps = count_following_noun_phrases(sentence, position)
                     prepositional_phrase = follows_prepositional_phrase(sentence, position)
@@ -477,7 +399,7 @@ def process_corpus(file_path):
                     tokens_before_inf = tokens_before_infinitive(sentence, position)
                     tokens_to_prep = tokens_between_it_and_preposition(sentence, position)
                     adj_np_following = adj_np_after_it(sentence, position)
-                    dep_relation = dependency_relation_type(sentence, position)
+                    dep_relation = dependency_relation_type(sentence, it_occurrence)
                     weather_verb = is_weather_verb_following(sentence, position)
                     cognitive_verb = is_cognitive_verb_following(sentence, position)
                     results.append({
@@ -508,13 +430,11 @@ def process_corpus(file_path):
 
 
 if __name__ == '__main__':
-    # Process the corpus
     results = process_corpus('it-corpus.tsv')
 
     
     
 
-    # Export results to CSV
     with open('features_output.csv', 'w', newline='', encoding='utf-8') as csvfile:
         fieldnames = ['class', 'f1_position_it', 'f2_num_tokens', 'f3_num_punctuation', 'f4_num_preceding_nps', 'f5_num_following_nps', 'f6_prepositional_phrase', 'f7_pos_tags_preceding_and_succeeding', 'f8_ing_verb', 'f9_preposition',
                       'f10_num_adjectives_after', 'f11_verb_preceding', 'f12_verb_following', 'f13_adj_following', 'f14_np_after_it_contains_adj', 'f15_tokens_before_infinitive', 'f16_tokens_between_it_and_prep', 'f17_adj_np_after_it', 'f18_dependency_relation', 'f19_weather_verb', 'f20_cognitive_verb']
