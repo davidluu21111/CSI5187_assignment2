@@ -161,6 +161,16 @@ def follows_prepositional_phrase(sentence, it_position):
     return False
 
 def preceding_succeeding_pos_tags(sentence, it_position):
+    '''
+    Extracts the POS tags of the 4 preceding tokens and 4 succeeding tokens of an occurrence of "it"
+
+    Args:
+        sentence(str): The sentence to be analyzed
+        it_positon(int): The positon of "it" in the sentence (1-indexed)
+
+    Returns:
+        list of Strings: List of POS tags of the tokens
+    '''
     tokens = word_tokenize(sentence)
     pos_tags = pos_tag(tokens)
 
@@ -174,24 +184,54 @@ def preceding_succeeding_pos_tags(sentence, it_position):
     return before+after
 
 def followed_by_ing_verb(sentence, it_position):
+    '''
+    Determines whether a specific instance of "it" is followed by an -ing form of verb
+
+    Args:
+        sentence(str): The sentence to be analyzed
+        it_position(int): The position of "it" in the sentence (1-indexed)
+    
+    Returns:
+        bool: True if "it" is followed by an -ing form of verb, false otherwise
+    '''
     tokens = word_tokenize(sentence)
     pos_tags = pos_tag(tokens)
 
-    if it_position < len(pos_tags): 
-        if pos_tags[it_position][1] == 'VBG':
+    for i in range(it_position, len(pos_tags)):
+        if pos_tags[i][1] == 'VBG':
             return True
     return False
 
 def followed_by_preposition(sentence, it_position):
+    '''
+    Determines whether a specific instance of "it" is followed by a preposition
+
+    Args: 
+        sentence(str): The sentence to be analyzed
+        it_position(int): The position of "it" in the sentence (1-indexed)
+
+    Returns:
+        bool: True if "it" is followed by a preposition, false otherwise
+    '''
     tokens = word_tokenize(sentence)
     pos_tags = pos_tag(tokens)
 
-    if it_position  < len(pos_tags):
-        if pos_tags[it_position][1] == 'IN':
+    for i in range(it_position, len(pos_tags)):
+        if pos_tags[i][1] == 'IN':
             return True
     return False
 
 def num_adjectives_after(sentence, it_position):
+    '''
+    Counts the numebr of adjectives after an instance of "it"
+
+    Args:
+        sentence(str): The sentence to be analyzed
+        it_position(int): The position of "it" in the sentence (1-indexed)
+    
+    Returns:
+        int: Number of adjectives after the occurrence of "it"
+    '''
     tokens = word_tokenize(sentence)
     pos_tags = pos_tag(tokens)
 
@@ -203,32 +243,74 @@ def num_adjectives_after(sentence, it_position):
     return count_adj 
 
 def preceded_by_verb(sentence, it_position):
+    '''
+    Determines whether a specific instance of "it" is preceded by a verb
+
+    Args:
+        sentence(str): The sentence to be analyzed
+        it_position(int): The position of "it" in the sentence (1-indexed)
+
+    Returns:
+        bool: True if the instance of "it" is preceded by a verb, false otherwise.
+    '''
     tokens = word_tokenize(sentence)
     pos_tags = pos_tag(tokens)
 
-    if it_position-2 > 0:
-        return pos_tags[it_position-2][1] in ['VB', 'VBD', 'VBG', 'VBN', 'VBP', 'VBZ']
+    for i in range(0, it_position - 1):
+        if pos_tags[i][1] in ['VB', 'VBD', 'VBG', 'VBN', 'VBP', 'VBZ']:
+            return True
 
     return False
 
 def followed_by_verb(sentence, it_position):
+    '''
+    Determines whether a specific instance of "it" is followed by a verb
+
+    Args:
+        sentence(str): The sentence to be analyzed
+        it_position(int): The position of "it" in the sentence (1-indexed)
+    
+    Returns:
+        bool: True if the instance of "it" is followed by a verb, false otherwise
+    '''
     tokens = word_tokenize(sentence)
     pos_tags = pos_tag(tokens)
 
-    if it_position < len(pos_tags):
-        return pos_tags[it_position][1] in ['VB', 'VBD', 'VBG', 'VBN', 'VBP', 'VBZ']
+    for i in range(it_position, len(pos_tags)):
+        if pos_tags[i][1] in ['VB', 'VBD', 'VBG', 'VBN', 'VBP', 'VBZ']:
+            return True
     return False
 
 def followed_by_adj(sentence, it_position):
+    '''
+    Determines whether a specific instance of "it" is followed by an adjective
+
+    Args:
+        sentence(str): The sentence to be analyzed
+        it_position(int): The position of "it" in the sentence (1-indexed)
+
+    Returns:
+        bool: True if the instance of "it" is followed by an adjective, false otherwise
+    '''
     tokens = word_tokenize(sentence)
     pos_tags = pos_tag(tokens)
 
-    if it_position < len(pos_tags):
-        return pos_tags[it_position][1] in ['JJ', 'JJR', 'JJS']
-
+    for i in range(it_position, len(pos_tags)):
+        if pos_tags[i][1] in ['JJ', 'JJR', 'JJS']:
+            return True
     return False
 
 def np_after_it_contains_adj(sentence, it_position):
+    '''
+    Determines whether a noun phrase that contains an adjective is after an instance of "it"
+
+    Args:
+        senternce(str): The sentence to be analyzed
+        it_position(int): The position of "it" in the sentence (1-indexed)
+    
+    Returns:
+        bool: True if there's a noun phrase that contains an adjective after the "it", and false otherwise
+    '''
     
     tokens = word_tokenize(sentence)
     pos_tags = nltk.pos_tag(tokens)
@@ -258,6 +340,17 @@ def np_after_it_contains_adj(sentence, it_position):
 
 def tokens_before_infinitive(sentence, it_position):
 
+    '''
+    Counts the number of tokens before an infinitive verb after the "it"
+
+    Args:
+        sentence(str): The sentence to be analyzed
+        it_position(int): The position of "it" in the sentence (1-indexed)
+    
+    Returns:
+        int: The number of tokens before the following infinitive verb
+    '''
+
     tokens = word_tokenize(sentence)
     pos_tags = pos_tag(tokens)
 
@@ -268,6 +361,16 @@ def tokens_before_infinitive(sentence, it_position):
     return 0
 
 def tokens_between_it_and_preposition(sentence, it_position):
+    '''
+    Counts the number of tokens between an instance of "it" and first following preposition
+
+    Args:
+        sentence(str): The sentence to be analyzed
+        it_position(int): The position of "it" in the sentence (1-indexed)
+
+    Returns:
+        int: The number of tokens between "it" and its first following preposition
+    '''
 
     tokens = word_tokenize(sentence)
     pos_tags = pos_tag(tokens)
@@ -279,6 +382,16 @@ def tokens_between_it_and_preposition(sentence, it_position):
     return 0
 
 def adj_np_after_it(sentence, it_position):
+    '''
+    Determines if there is a sequence adjective + noun phrase after the instance of "it"
+
+    Args:
+        sentence(str): The sentence to be analyzed
+        it_position(int): The position of "it" in the sentence (1-indexed)
+
+    Returns:
+        bool: True if there is a sequence of adjective + noun phrase after the instance of "it" and false otherwise
+    '''
     tokens = word_tokenize(sentence)
     pos_tags = nltk.pos_tag(tokens)
 
@@ -324,6 +437,16 @@ def dependency_relation_type(sentence, it_position):
     return it_token.dep_
 
 def is_weather_verb_following(sentence, it_position):
+    '''
+    Determines whether the instance of "it" is immediately followed by a weather verb
+
+    Args:
+        sentence(str): The sentence to be analyzed
+        it_position(int): the position of 'it' in the sentence (1-indexed)
+    
+    Returns:
+        bool: True if "it" is immediately followed by a weather verb, false otherwise
+    '''
 
     tokens = word_tokenize(sentence)
     pos_tags = pos_tag(tokens)
@@ -342,6 +465,16 @@ def is_weather_verb_following(sentence, it_position):
     return False
 
 def is_cognitive_verb_following(sentence, it_position):
+    '''
+    Determines whether the instance of "it" is immediately followed by a cognitive verb
+
+    Args:
+        sentence(str): The sentence to be analyzed
+        it_position(int): the position of 'it' in the sentence (1-indexed)
+    
+    Returns:
+        bool: True if "it" is immediately followed by a cognitive verb, false otherwise
+    '''
 
     tokens = word_tokenize(sentence)
     pos_tags = pos_tag(tokens)
